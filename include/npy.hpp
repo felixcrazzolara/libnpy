@@ -27,10 +27,13 @@
 #include <array>
 #include <complex>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <memory>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -62,7 +65,7 @@ const char big_endian_char = '>';
 const char no_endian_char = '|';
 
 constexpr std::array<char, 3> endian_chars = {little_endian_char, big_endian_char, no_endian_char};
-constexpr std::array<char, 4> numtype_chars = {'f', 'i', 'u', 'c'};
+constexpr std::array<char, 5> numtype_chars = {'b', 'f', 'i', 'u', 'c'};
 
 constexpr char host_endian_char = (big_endian ? big_endian_char : little_endian_char);
 
@@ -73,19 +76,19 @@ using shape_t = std::vector<ndarray_len_t>;
 using version_t = std::pair<char, char>;
 
 struct dtype_t {
-  char byteorder;
-  char kind;
-  unsigned int itemsize;
+    char byteorder;
+    char kind;
+    unsigned int itemsize;
 
-  inline std::string str() const {
-    std::stringstream ss;
-    ss << byteorder << kind << itemsize;
-    return ss.str();
-  }
+    inline std::string str() const {
+        std::stringstream ss;
+        ss << byteorder << kind << itemsize;
+        return ss.str();
+    }
 
-  inline std::tuple<const char, const char, const unsigned int> tie() const {
-    return std::tie(byteorder, kind, itemsize);
-  }
+    inline std::tuple<const char, const char, const unsigned int> tie() const {
+        return std::tie(byteorder, kind, itemsize);
+    }
 };
 
 struct header_t {
@@ -119,6 +122,7 @@ inline version_t read_magic(std::istream &istream) {
 }
 
 const std::unordered_map<std::type_index, dtype_t> dtype_map = {
+    {std::type_index(typeid(bool)), {no_endian_char, 'b', sizeof(bool)}},
     {std::type_index(typeid(float)), {host_endian_char, 'f', sizeof(float)}},
     {std::type_index(typeid(double)), {host_endian_char, 'f', sizeof(double)}},
     {std::type_index(typeid(long double)), {host_endian_char, 'f', sizeof(long double)}},
@@ -594,6 +598,69 @@ inline void LoadArrayFromNumpy(const std::string &filename, std::vector<unsigned
   LoadArrayFromNumpy<Scalar>(filename, shape, fortran_order, data);
 }
 // NOLINTEND(*-avoid-c-arrays)
+
+class Tensor {
+public:
+
+Tensor() {}
+
+Tensor(const dtype_t &dtype) : dtype_(dtype) {}
+
+inline const dtype_t& dtype() const {
+    return dtype_.value();
+}
+
+inline const std::vector<long int>& shape() const {
+    return shape_;
+}
+
+inline const std::shared_ptr<void>& data() const {
+    return data_;
+}
+
+Tensor& load(const std::string &filename) {
+    std::ifstream stream(filename, std::ifstream::binary);
+    if (!stream) {
+        throw std::runtime_error("io error: failed to open a file.");
+    }
+
+    // Read the header
+    std::string header_s = read_header(stream);
+
+    // Parse the header
+    header_t header = parse_header(header_s);
+
+    // Compute the number of elements based on the shape
+    ndarray_len_t num_elements = static_cast<size_t>(comp_size(header.shape));
+
+    // Set the dtype
+    dtype_ = header.dtype;
+
+    // Set the shape
+    shape_ = std::vector<long int>(header.shape.begin(), header.shape.end());
+
+    // Allocate memory
+    const size_t num_bytes = num_elements*header.dtype.itemsize;
+    data_ = std::shared_ptr<void>(std::aligned_alloc(header.dtype.itemsize, num_bytes),
+        [](void *ptr) { std::free(ptr); });
+
+    // Read the data
+    stream.read(reinterpret_cast<char*>(data_.get()), num_bytes);
+
+    return *this;
+}
+
+private:
+
+std::vector<long int> shape_;
+std::shared_ptr<void> data_;
+std::optional<dtype_t> dtype_;
+
+};
+
+inline Tensor load(const std::string &filename) {
+    return Tensor().load(filename);
+}
 
 }  // namespace npy
 
