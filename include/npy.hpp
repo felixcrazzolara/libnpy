@@ -32,6 +32,7 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <sstream>
@@ -140,6 +141,8 @@ const std::unordered_map<std::type_index, dtype_t> dtype_map = {
     {std::type_index(typeid(std::complex<float>)), {host_endian_char, 'c', sizeof(std::complex<float>)}},
     {std::type_index(typeid(std::complex<double>)), {host_endian_char, 'c', sizeof(std::complex<double>)}},
     {std::type_index(typeid(std::complex<long double>)), {host_endian_char, 'c', sizeof(std::complex<long double>)}}};
+
+constexpr dtype_t dBool{no_endian_char, 'b', sizeof(bool)};
 
 // helpers
 inline bool is_digits(const std::string &str) { return std::all_of(str.begin(), str.end(), ::isdigit); }
@@ -456,11 +459,13 @@ inline std::string read_header(std::istream &istream) {
   return header;
 }
 
-inline ndarray_len_t comp_size(const shape_t &shape) {
-  ndarray_len_t size = 1;
-  for (ndarray_len_t i : shape) size *= i;
+template <typename T>
+requires std::is_integral_v<T>
+inline T comp_size(const std::vector<T> &shape) {
+    T size = 1;
+    for (const T &i : shape) size *= i;
 
-  return size;
+    return size;
 }
 
 template <typename Scalar>
@@ -604,6 +609,21 @@ public:
 
 Tensor() {}
 
+Tensor(const std::pair<size_t,size_t> &size, const dtype_t &dtype) :
+    dtype_{dtype},
+    shape_{static_cast<long int>(size.first), static_cast<long int>(size.second)}
+{
+    // Sanity check
+    if (size.first > static_cast<size_t>(std::numeric_limits<long int>::max()) ||
+        size.second > static_cast<size_t>(std::numeric_limits<long int>::max())) {
+        std::cerr << "Error: Tried to allocate a huge tensor." << std::endl;
+        exit(-1);
+    }
+
+    // Allocate memory
+    allocate_memory();
+}
+
 Tensor(const dtype_t &dtype) : dtype_(dtype) {}
 
 inline const dtype_t& dtype() const {
@@ -630,9 +650,6 @@ Tensor& load(const std::string &filename) {
     // Parse the header
     header_t header = parse_header(header_s);
 
-    // Compute the number of elements based on the shape
-    ndarray_len_t num_elements = static_cast<size_t>(comp_size(header.shape));
-
     // Set the dtype
     dtype_ = header.dtype;
 
@@ -640,9 +657,7 @@ Tensor& load(const std::string &filename) {
     shape_ = std::vector<long int>(header.shape.begin(), header.shape.end());
 
     // Allocate memory
-    const size_t num_bytes = num_elements*header.dtype.itemsize;
-    data_ = std::shared_ptr<void>(std::aligned_alloc(header.dtype.itemsize, num_bytes),
-        [](void *ptr) { std::free(ptr); });
+    const size_t num_bytes = allocate_memory();
 
     // Read the data
     stream.read(reinterpret_cast<char*>(data_.get()), num_bytes);
@@ -651,6 +666,20 @@ Tensor& load(const std::string &filename) {
 }
 
 private:
+
+size_t allocate_memory() {
+    // Compute the number of elements based on the shape
+    const ndarray_len_t num_elements = static_cast<size_t>(comp_size(shape_));
+
+    // Compute the number of bytes to allocate
+    const size_t num_bytes = num_elements * dtype_.value().itemsize;
+
+    // Allocate memory
+    data_ = std::shared_ptr<void>(std::aligned_alloc(dtype_.value().itemsize, num_bytes),
+        [](void *ptr) { std::free(ptr); });
+
+    return num_bytes;
+}
 
 std::vector<long int> shape_;
 std::shared_ptr<void> data_;
