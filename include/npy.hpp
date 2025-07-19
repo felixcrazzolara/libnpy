@@ -658,7 +658,7 @@ Tensor& load(const std::string &filename) {
     shape_ = std::vector<long int>(header.shape.begin(), header.shape.end());
 
     // Allocate memory
-    const size_t num_bytes = allocate_memory();
+    allocate_memory();
 
     // Read the data
     stream.read(reinterpret_cast<char*>(data_.get()), num_bytes);
@@ -666,25 +666,40 @@ Tensor& load(const std::string &filename) {
     return *this;
 }
 
+inline Tensor& zero_() {
+    if (!data_) {
+        return *this;
+    }
+
+    // Set the entire tensor to zero
+    if (dtype_.value().kind != 'f') {
+        std::memset(data_.get(), 0, num_bytes);
+    } else {
+        std::cerr << "Error Tensor::zero, not implemented for floating-point types." << std::endl;
+        exit(-1);
+    }
+
+    return *this;
+}
+
 private:
 
-size_t allocate_memory() {
+void allocate_memory() {
     // Compute the number of elements based on the shape
     const ndarray_len_t num_elements = static_cast<size_t>(comp_size(shape_));
 
     // Compute the number of bytes to allocate
-    const size_t num_bytes = num_elements * dtype_.value().itemsize;
+    num_bytes = num_elements * dtype_.value().itemsize;
 
     // Allocate memory
     data_ = std::shared_ptr<void>(std::aligned_alloc(dtype_.value().itemsize, num_bytes),
         [](void *ptr) { std::free(ptr); });
-
-    return num_bytes;
 }
 
 std::vector<long int> shape_;
 std::shared_ptr<void> data_;
 std::optional<dtype_t> dtype_;
+size_t num_bytes;
 
 };
 
