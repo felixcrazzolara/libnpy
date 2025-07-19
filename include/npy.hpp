@@ -143,6 +143,7 @@ const std::unordered_map<std::type_index, dtype_t> dtype_map = {
     {std::type_index(typeid(std::complex<long double>)), {host_endian_char, 'c', sizeof(std::complex<long double>)}}};
 
 constexpr dtype_t dBool{no_endian_char, 'b', sizeof(bool)};
+constexpr dtype_t dUInt8{no_endian_char, 'i', sizeof(uint8_t)};
 
 // helpers
 inline bool is_digits(const std::string &str) { return std::all_of(str.begin(), str.end(), ::isdigit); }
