@@ -666,6 +666,7 @@ Tensor& load(const std::string &filename) {
     return *this;
 }
 
+/* Modifier */
 inline Tensor& zero_() {
     if (!data_) {
         return *this;
@@ -675,11 +676,44 @@ inline Tensor& zero_() {
     if (dtype_.value().kind != 'f') {
         std::memset(data_.get(), 0, num_bytes);
     } else {
-        std::cerr << "Error Tensor::zero, not implemented for floating-point types." << std::endl;
+        std::cerr << "Error in Tensor::zero, not implemented for floating-point types.";
+        std::cerr << std::endl;
         exit(-1);
     }
 
     return *this;
+}
+
+/* Indexing */
+template <typename T, typename U>
+requires std::is_integral_v<U>
+inline T at(const std::pair<U,U> &p) const {
+    // Sanity checks
+    if (shape_.size() != 2) {
+        std::cerr << "Error in Tensor::at(std::pair), tensor has shape " << shape_to_string();
+        std::cerr << ". Must have shape (x,y)." << std::endl;
+    }
+    if (shape_[0] <= p.first || shape_[1] <= p.second) {
+        std::cerr << "Error in Tensor:at(std::pair), index [" << p.first << ", " << p.second;
+        std::cerr << "] out of range for " << shape_to_string() << "." << std::endl;
+        exit(-1);
+    }
+
+    // Return the value
+    return static_cast<const T*>(data_.get())[p.first * shape_[1] + p.second];
+}
+
+/* String representations */
+std::string shape_to_string() const {
+    std::string ret = "[";
+    for (size_t i = 0; i < shape_.size(); ++i) {
+        if (i + 1 == shape_.size()) {
+            ret += std::to_string(shape_[i]);
+        } else {
+            ret += std::to_string(shape_[i]) + ", ";
+        }
+    }
+    return ret + "]";
 }
 
 private:
