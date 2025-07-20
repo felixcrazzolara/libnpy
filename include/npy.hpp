@@ -693,7 +693,7 @@ inline T at(const std::pair<U,U> &p) const {
         std::cerr << "Error in Tensor::at(std::pair), tensor has shape " << shape_to_string();
         std::cerr << ". Must have shape (x,y)." << std::endl;
     }
-    if (shape_[0] <= p.first || shape_[1] <= p.second) {
+    if (p.first < 0 || p.second < 0 || shape_[0] <= p.first || shape_[1] <= p.second) {
         std::cerr << "Error in Tensor:at(std::pair), index [" << p.first << ", " << p.second;
         std::cerr << "] out of range for " << shape_to_string() << "." << std::endl;
         exit(-1);
