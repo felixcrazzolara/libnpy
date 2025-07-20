@@ -608,6 +608,7 @@ inline void LoadArrayFromNumpy(const std::string &filename, std::vector<unsigned
 class Tensor {
 public:
 
+/* Constructors */
 Tensor() {}
 
 Tensor(const std::pair<size_t,size_t> &size, const dtype_t &dtype) :
@@ -627,6 +628,8 @@ Tensor(const std::pair<size_t,size_t> &size, const dtype_t &dtype) :
 
 Tensor(const dtype_t &dtype) : dtype_(dtype) {}
 
+
+/* Getter */
 inline const dtype_t& dtype() const {
     return dtype_.value();
 }
@@ -637,6 +640,21 @@ inline const std::vector<long int>& shape() const {
 
 inline const std::shared_ptr<void>& data() const {
     return data_;
+}
+
+inline long int size(const int &dim) const {
+    // Allow to query e.g. the size of the last dimension with size(-1)
+    int dim_ = dim;
+    if (dim < 0) {
+        dim_ = shape_.size() - dim;
+    }
+
+    // Sanity check
+    if (dim_ < 0 || dim_ >= shape_.size()) {
+        std::cerr << "Error in Tensor::size, dim " << dim << " is out of range." << std::endl;
+    }
+
+    return shape_[dim_];
 }
 
 Tensor& load(const std::string &filename) {
