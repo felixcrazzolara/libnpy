@@ -703,10 +703,11 @@ inline Tensor& zero_() {
 }
 
 /* Indexing */
-template <typename T, typename U>
+private:
+
+template <typename U>
 requires std::is_integral_v<U>
-inline T at(const std::pair<U,U> &p) const {
-    // Sanity checks
+inline void check_index(const std::pair<U,U> &p) const {
     if (shape_.size() != 2) {
         std::cerr << "Error in Tensor::at(std::pair), tensor has shape " << shape_to_string();
         std::cerr << ". Must have shape (x,y)." << std::endl;
@@ -716,10 +717,28 @@ inline T at(const std::pair<U,U> &p) const {
         std::cerr << "] out of range for " << shape_to_string() << "." << std::endl;
         exit(-1);
     }
+}
 
-    // Return the value
+public:
+
+template <typename T, typename U>
+requires std::is_integral_v<U>
+inline const T& at(const std::pair<U,U> &p) const {
+    // Sanity checks
+    check_index(p);
+
     return static_cast<const T*>(data_.get())[p.first * shape_[1] + p.second];
 }
+
+template <typename T, typename U>
+requires std::is_integral_v<U>
+inline T& at(const std::pair<U,U> &p) {
+    // Sanity checks
+    check_index(p);
+
+    return static_cast<T*>(data_.get())[p.first * shape_[1] + p.second];
+}
+
 
 /* String representations */
 std::string shape_to_string() const {

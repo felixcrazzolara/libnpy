@@ -95,6 +95,7 @@ cd tests
 meson setup builddir
 meson test -Cbuilddir
 ```
+The CMake tests can be executed with `ctest` in the build directory.
 
 ## Known limitations
 1. Only a few data types are supported.
